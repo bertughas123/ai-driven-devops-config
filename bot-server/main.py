@@ -34,6 +34,7 @@ from jsonschema import validate, ValidationError
 # ============================================================================
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+LLM_MODEL = os.getenv("LLM_MODEL", "phi3:3.8b")
 SCHEMA_SERVICE_URL = os.getenv("SCHEMA_SERVICE_URL", "http://localhost:5001")
 VALUES_SERVICE_URL = os.getenv("VALUES_SERVICE_URL", "http://localhost:5002")
 VALUES_DIR = os.getenv("VALUES_DIR", "./data/values")
@@ -253,7 +254,7 @@ def classify_app_name(user_input: str) -> str:
         formatted_user_input = f"<request>{user_input}</request>"
 
         response = ollama.chat(
-            model="llama3.2",
+            model=LLM_MODEL,
             messages=[
                 {"role": "system", "content": CLASSIFIER_SYSTEM_PROMPT},
                 {"role": "user", "content": formatted_user_input}
@@ -306,7 +307,7 @@ Output the modified JSON only:"""
 
     try:
         response = ollama.chat(
-            model="llama3.2",
+            model=LLM_MODEL,
             messages=[
                 {"role": "system", "content": GENERATOR_SYSTEM_PROMPT},
                 {"role": "user", "content": user_message}
@@ -416,6 +417,7 @@ if __name__ == "__main__":
     print(f"Bot Service starting...")
     print(f"Address: {HOST}:{PORT}")
     print(f"Ollama: {OLLAMA_HOST}")
+    print(f"LLM Model: {LLM_MODEL}")
     print(f"Schema Service: {SCHEMA_SERVICE_URL}")
     print(f"Values Service: {VALUES_SERVICE_URL}")
     print(f"Values Dir: {VALUES_DIR}")
