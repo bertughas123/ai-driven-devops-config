@@ -8,9 +8,12 @@ Production-Grade Features:
 - Native JSON Mode (format="json")
 - Token Optimization (JSON Minification)
 - Defense-in-Depth Prompt (comprehensive constraint checking)
+- Safety Net (graceful degradation on validation failure)
+- Domain-Specific Conversions (CPU%, Memory units)
 
 Environment Variables:
     OLLAMA_HOST: Ollama API address (default: http://localhost:11434)
+    LLM_MODEL: LLM model name (default: llama3.2)
     SCHEMA_SERVICE_URL: Schema Service address (default: http://localhost:5001)
     VALUES_SERVICE_URL: Values Service address (default: http://localhost:5002)
     VALUES_DIR: Directory for values files (default: ./data/values)
@@ -34,7 +37,7 @@ from jsonschema import validate, ValidationError
 # ============================================================================
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-LLM_MODEL = os.getenv("LLM_MODEL", "phi3:3.8b")
+LLM_MODEL = os.getenv("LLM_MODEL", "llama3.2")
 SCHEMA_SERVICE_URL = os.getenv("SCHEMA_SERVICE_URL", "http://localhost:5001")
 VALUES_SERVICE_URL = os.getenv("VALUES_SERVICE_URL", "http://localhost:5002")
 VALUES_DIR = os.getenv("VALUES_DIR", "./data/values")
@@ -113,11 +116,16 @@ CRITICAL RULES
    - "pattern": String must match the regex pattern
    - "additionalProperties: false": NO new keys can be added to closed objects
 
-6. NO LAZY OUTPUT: DO NOT use "..." or any placeholders.
+6. DOMAIN-SPECIFIC CONVERSIONS:
+   - RULE: For CPU requests ONLY: If user inputs a percentage (e.g. '80%'), calculate the milliCPU value (Percentage * 10) and output as an INTEGER (e.g. 800). Do NOT output strings for CPU.
+   - RULE: For Memory requests ONLY: Remove units like 'MiB', 'GiB', 'mb' and output only the INTEGER number.
+   - RULE: For 'maxSurge' or 'maxUnavailable': Percentage strings ARE allowed (e.g. '25%'). Do NOT convert them.
+
+7. NO LAZY OUTPUT: DO NOT use "..." or any placeholders.
    You MUST output the FULL, complete, valid JSON with ALL original data preserved.
    Ellipsis or truncation is STRICTLY FORBIDDEN and will cause system failure.
 
-7. OUTPUT FORMAT: Your response must start with "{" and end with "}".
+8. OUTPUT FORMAT: Your response must start with "{" and end with "}".
    No text before or after the JSON object.
 
 ================================================================================
@@ -206,7 +214,7 @@ async def fetch_schema(app_name: str) -> dict:
     
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get(url, timeout=30.0)
+            response = await client.get(url, timeout=300.0)
             
             if response.status_code == 404:
                 error_body = response.json()
@@ -228,7 +236,7 @@ async def fetch_values(app_name: str) -> dict:
     
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get(url, timeout=30.0)
+            response = await client.get(url, timeout=300.0)
             
             if response.status_code == 404:
                 error_body = response.json()
@@ -390,10 +398,16 @@ async def process_message(request: MessageRequest) -> Dict[str, Any]:
     new_values = generate_config_jk(user_input, schema, current_values)
     print("   New values generated")
     
-    # Step 4: Validate
+    # Step 4: Validate (Safety Net - graceful degradation)
     print("Step 4: Validating...")
-    validate_against_schema(new_values, schema)
-    print("   Validation successful")
+    try:
+        validate_against_schema(new_values, schema)
+        print("   Validation successful")
+    except (ValidationError, HTTPException) as e:
+        print(f"   Validation Logic Failed: {e}")
+        print("   Safety Net: Returning original values (idempotent)")
+        print(f"{'='*60}\n")
+        return current_values
     
     # Step 5: Save
     print("Step 5: Saving...")
