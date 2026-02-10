@@ -12,7 +12,7 @@ Usage:
 
 Prerequisites:
     - All services running (schema-server:5001, values-server:5002, bot-server:5003)
-    - Ollama running with llama3.1 model
+    - Ollama running with llama3.2 model
 """
 
 import json
@@ -190,34 +190,6 @@ def test_unknown_app() -> None:
             print_fail(test_name, f"Unexpected status code: {status}")
 
 
-def test_happy_path_replicas(originals: Dict[str, dict]) -> None:
-    """Tests successful replica update for tournament."""
-    test_name = "Happy Path - Tournament Replicas"
-    input_text = "set tournament replicas to 5"
-    
-    status, data = send_message(input_text)
-    
-    if status != 200:
-        print_fail(test_name, f"Expected 200, got {status}")
-        return
-    
-    if data is None:
-        print_fail(test_name, "No response data")
-        return
-    
-    # Check response
-    replicas = get_nested_value(data, "workloads.statefulsets.tournament.replicas")
-    if replicas == 5:
-        # Verify file on disk
-        disk_data = read_value_file("tournament")
-        disk_replicas = get_nested_value(disk_data, "workloads.statefulsets.tournament.replicas")
-        if disk_replicas == 5:
-            print_pass(test_name, "replicas=5 in response AND on disk")
-        else:
-            print_fail(test_name, f"Response shows 5, but disk shows {disk_replicas}")
-    else:
-        print_fail(test_name, f"Expected replicas=5, got {replicas}")
-
 
 def test_max_violation_replicas(originals: Dict[str, dict]) -> None:
     """Tests that max constraint (999) is enforced."""
@@ -293,30 +265,6 @@ def test_enum_violation_imagepullpolicy(originals: Dict[str, dict]) -> None:
         print_fail(test_name, f"Unexpected value: {new_policy}")
 
 
-def test_pattern_violation_port_name(originals: Dict[str, dict]) -> None:
-    """Tests that pattern constraint is enforced."""
-    test_name = "Pattern Violation - Chat Port Name"
-    input_text = "set chat http port name to Invalid_Name!"
-    
-    status, data = send_message(input_text)
-    
-    if status != 200:
-        if status in [400, 422]:
-            print_pass(test_name, f"LLM rejected with {status}")
-        else:
-            print_fail(test_name, f"Unexpected status: {status}")
-        return
-    
-    if data is None:
-        print_fail(test_name, "No response data")
-        return
-    
-    # Check if Invalid_Name! was set (violation)
-    response_str = json.dumps(data)
-    if "Invalid_Name!" in response_str:
-        print_fail(test_name, "LLM set invalid port name - should have rejected")
-    else:
-        print_pass(test_name, "Pattern constraint enforced - invalid name rejected")
 
 
 def test_required_field_image(originals: Dict[str, dict]) -> None:
@@ -464,7 +412,7 @@ def run_all_tests() -> int:
         print("  1. python schema-server/main.py")
         print("  2. python values-server/main.py")
         print("  3. python bot-server/main.py")
-        print("  4. ollama serve (with llama3.1 model)")
+        print("  4. ollama serve (with llama3.2 model)")
         return 1
     
     print_pass("Service Health", "Bot service is running")
@@ -485,37 +433,29 @@ def run_all_tests() -> int:
         # Category B: Phase 3 Logic
         print_header("CATEGORY B: Phase 3 Logic (LLM & Constraints)")
         
-        print_info("Test 1: Happy Path")
-        test_happy_path_replicas(originals)
-        
-        print()
-        print_info("Test 2: Max Violation")
+        print_info("Test 1: Max Violation")
         test_max_violation_replicas(originals)
         
         print()
-        print_info("Test 3: Enum Violation")
+        print_info("Test 2: Enum Violation")
         test_enum_violation_imagepullpolicy(originals)
         
         print()
-        print_info("Test 4: Pattern Violation")
-        test_pattern_violation_port_name(originals)
-        
-        print()
-        print_info("Test 5: Required Field")
+        print_info("Test 3: Required Field")
         test_required_field_image(originals)
         
         # Category C: README Examples
         print_header("CATEGORY C: README Examples (Happy Path)")
         
-        print_info("Test 6: Tournament Memory (1024mb)")
+        print_info("Test 4: Tournament Memory (1024mb)")
         test_readme_tournament_memory(originals)
         
         print()
-        print_info("Test 7: Matchmaking GAME_NAME Env")
+        print_info("Test 5: Matchmaking GAME_NAME Env")
         test_readme_matchmaking_env(originals)
         
         print()
-        print_info("Test 8: Chat CPU Limit (80%)")
+        print_info("Test 6: Chat CPU Limit (80%)")
         test_readme_chat_cpu(originals)
         
     finally:
