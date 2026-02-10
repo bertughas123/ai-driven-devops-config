@@ -205,7 +205,7 @@ async def fetch_schema(app_name: str) -> dict:
     
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get(url, timeout=10.0)
+            response = await client.get(url, timeout=30.0)
             
             if response.status_code == 404:
                 error_body = response.json()
@@ -227,7 +227,7 @@ async def fetch_values(app_name: str) -> dict:
     
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get(url, timeout=10.0)
+            response = await client.get(url, timeout=30.0)
             
             if response.status_code == 404:
                 error_body = response.json()
@@ -253,14 +253,14 @@ def classify_app_name(user_input: str) -> str:
         formatted_user_input = f"<request>{user_input}</request>"
 
         response = ollama.chat(
-            model="llama3.1",
+            model="llama3.2",
             messages=[
                 {"role": "system", "content": CLASSIFIER_SYSTEM_PROMPT},
                 {"role": "user", "content": formatted_user_input}
             ],
             options={
                 "temperature": 0.0,
-                "num_ctx": 4096
+                "num_ctx": 2048
             }
         )
         
@@ -306,7 +306,7 @@ Output the modified JSON only:"""
 
     try:
         response = ollama.chat(
-            model="llama3.1",
+            model="llama3.2",
             messages=[
                 {"role": "system", "content": GENERATOR_SYSTEM_PROMPT},
                 {"role": "user", "content": user_message}
@@ -314,7 +314,7 @@ Output the modified JSON only:"""
             format="json",
             options={
                 "temperature": 0.1,
-                "num_ctx": 16384
+                "num_ctx": 8192
             }
         )
         
