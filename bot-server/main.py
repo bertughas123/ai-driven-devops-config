@@ -71,9 +71,7 @@ Input: <request>lower cpu limit of chat service to %80</request>
 Output: chat
 """
 
-GENERATOR_SYSTEM_PROMPT = """You are a Principal Application Configuration Architect.
-You specialize in both Kubernetes Infrastructure (deployments, statefulsets, resources, probes)
-AND Application Logic Configuration (environment variables, feature flags, runtime parameters).
+GENERATOR_SYSTEM_PROMPT = """You are a Configuration Architect for Kubernetes and Application Logic.
 
 You will receive:
 1. A JSON Schema defining allowed structure and constraints
@@ -81,32 +79,13 @@ You will receive:
 3. A user request to modify these values
 
 ================================================================================
-PRIORITY RULES (Hierarchy of Orders)
-================================================================================
-⚠️ ABSOLUTE LAW: Schema Constraints ALWAYS override User Requests.
-If a user asks to set a value that violates the schema, you MUST refuse and return
-the ORIGINAL JSON unchanged. User convenience NEVER trumps schema integrity.
-
-================================================================================
-VIOLATION CHECKLIST (Pre-Computation - Run This BEFORE Generating Output)
-================================================================================
-Before outputting ANY JSON, mentally verify:
-
-☐ PATH VALIDITY: Does the requested path exist in the schema?
-☐ ENUM CHECK: If "anyOf"/"const" exists, is the value in the allowed list?
-☐ MIN/MAX CHECK: If "minimum"/"maximum" exists, is the number within bounds?
-☐ PATTERN CHECK: If "pattern" exists, does the string match the regex?
-☐ REQUIRED CHECK: Are all "required" fields still present after modification?
-☐ CLOSED OBJECT CHECK: If "additionalProperties: false", is the key already defined?
-
-If ANY check fails → Return ORIGINAL JSON unchanged.
-
-================================================================================
 CRITICAL RULES
 ================================================================================
-1. Output ONLY valid JSON (no explanations, no markdown, no code blocks)
-2. STRICTLY follow the schema structure
-3. PRESERVE ALL unrelated fields exactly as they are
+Schema constraints always override user requests. If any constraint is violated, return the ORIGINAL JSON unchanged.
+
+1. PRESERVE ALL unrelated fields exactly as they are
+2. Output ONLY valid JSON (no explanations, no markdown, no code blocks)
+3. STRICTLY follow the schema structure
 4. Apply ONLY the requested changes
 5. If a requested value VIOLATES ANY schema constraint, return the ORIGINAL JSON unchanged.
    Constraint types:
@@ -129,69 +108,56 @@ CRITICAL RULES
    No text before or after the JSON object.
 
 ================================================================================
-EXAMPLES (Few-Shot Learning with Defense-in-Depth)
+EXAMPLES
 ================================================================================
 
 ---
-EXAMPLE 1: Deep Nested Update (resources.memory) ✅ SUCCESS
-User Request: "set tournament memory limit to 8192 MiB"
+EXAMPLE 1: Memory Update
+User Request: "set tournament service memory to 2048mb"
 
 Schema Constraint: {"memory":{"properties":{"limitMiB":{"minimum":32,"type":"number"}}}}
 
-Current Values (minified):
+Current Values:
 {"workloads":{"statefulsets":{"tournament":{"replicas":2,"containers":{"tournament":{"resources":{"cpu":{"limitMilliCPU":2500,"requestMilliCPU":2000},"memory":{"limitMiB":4096,"requestMiB":4096}}}},"topologySpread":[{"maxSkew":1}]}}}}
 
-Expected Output (minified):
-{"workloads":{"statefulsets":{"tournament":{"replicas":2,"containers":{"tournament":{"resources":{"cpu":{"limitMilliCPU":2500,"requestMilliCPU":2000},"memory":{"limitMiB":8192,"requestMiB":4096}}}},"topologySpread":[{"maxSkew":1}]}}}}
-
-✅ WHY ALLOWED: 8192 > minimum(32). replicas, cpu, topologySpread PRESERVED.
+Expected Output:
+{"workloads":{"statefulsets":{"tournament":{"replicas":2,"containers":{"tournament":{"resources":{"cpu":{"limitMilliCPU":2500,"requestMilliCPU":2000},"memory":{"limitMiB":2048,"requestMiB":4096}}}},"topologySpread":[{"maxSkew":1}]}}}}
 
 ---
-EXAMPLE 2: Map/Object Addition (envs) ✅ SUCCESS
+EXAMPLE 2: Env Variable Addition
 User Request: "add LOG_LEVEL env variable set to DEBUG for matchmaking"
 
 Schema Constraint: {"envs":{"additionalProperties":true,"patternProperties":{"^(.*)$":{"anyOf":[{"type":"string"},{"type":"number"}]}}}}
 
-Current Values (minified):
+Current Values:
 {"workloads":{"deployments":{"matchmaking":{"containers":{"matchmaking":{"envs":{"GAME_NAME":"toonblast"},"resources":{"memory":{"limitMiB":1024}}}}}}}}
 
-Expected Output (minified):
+Expected Output:
 {"workloads":{"deployments":{"matchmaking":{"containers":{"matchmaking":{"envs":{"GAME_NAME":"toonblast","LOG_LEVEL":"DEBUG"},"resources":{"memory":{"limitMiB":1024}}}}}}}}
 
-✅ WHY ALLOWED: "additionalProperties: true" permits adding new keys. GAME_NAME PRESERVED.
-
 ---
-EXAMPLE 3: Enum Constraint Violation ❌ REJECT
+EXAMPLE 3: Enum Violation - Reject
 User Request: "set matchmaking imagePullPolicy to Sometimes"
 
 Schema Constraint: {"imagePullPolicy":{"anyOf":[{"const":"Always"},{"const":"IfNotPresent"},{"const":"Never"}]}}
 
-Current Values (minified):
+Current Values:
 {"workloads":{"deployments":{"matchmaking":{"containers":{"matchmaking":{"imagePullPolicy":"IfNotPresent"}}}}}}
 
-Expected Output (minified):
+Expected Output:
 {"workloads":{"deployments":{"matchmaking":{"containers":{"matchmaking":{"imagePullPolicy":"IfNotPresent"}}}}}}
-
-❌ WHY REJECTED: "Sometimes" is NOT in enum [Always, IfNotPresent, Never]. ORIGINAL PRESERVED.
 
 ---
-EXAMPLE 4: Closed Object Violation (additionalProperties: false) ❌ REJECT
-User Request: "add customField with value test123 to tournament container resources"
+EXAMPLE 4: CPU Percentage Conversion
+User Request: "lower cpu limit of chat service to %70"
 
-Schema Constraint: {"resources":{"additionalProperties":false,"properties":{"cpu":{...},"memory":{...}}}}
+Schema Constraint: {"cpu":{"properties":{"limitMilliCPU":{"minimum":10,"type":"number"}}}}
 
-Current Values (minified):
-{"workloads":{"statefulsets":{"tournament":{"containers":{"tournament":{"resources":{"cpu":{"limitMilliCPU":2500},"memory":{"limitMiB":4096}}}}}}}}
+Current Values:
+{"workloads":{"deployments":{"chat":{"containers":{"chat":{"resources":{"cpu":{"limitMilliCPU":1500,"requestMilliCPU":1000},"memory":{"limitMiB":2048,"requestMiB":512}}}}}}}}
 
-Expected Output (minified):
-{"workloads":{"statefulsets":{"tournament":{"containers":{"tournament":{"resources":{"cpu":{"limitMilliCPU":2500},"memory":{"limitMiB":4096}}}}}}}}
-
-❌ WHY REJECTED: "additionalProperties: false" means NO new keys allowed.
-   "resources" only accepts "cpu" and "memory". "customField" is INVALID. ORIGINAL PRESERVED.
-
-================================================================================
-Now process the actual request:
-================================================================================
+Expected Output:
+{"workloads":{"deployments":{"chat":{"containers":{"chat":{"resources":{"cpu":{"limitMilliCPU":700,"requestMilliCPU":1000},"memory":{"limitMiB":2048,"requestMiB":512}}}}}}}}
 """
 
 
@@ -294,7 +260,6 @@ def generate_config_jk(user_input: str, schema: dict, current_values: dict) -> d
     Features:
     - Native JSON Mode (format="json")
     - Token Optimization (minified JSON)
-    - Defense-in-Depth Prompt
     
     Note: The '_jk' suffix is required by the hidden rule in README.md.
     """
@@ -303,7 +268,9 @@ def generate_config_jk(user_input: str, schema: dict, current_values: dict) -> d
     schema_minified = json.dumps(schema, separators=(',', ':'))
     values_minified = json.dumps(current_values, separators=(',', ':'))
     
-    user_message = f"""Schema:
+    user_message = f"""Now process the actual request:
+
+Schema:
 {schema_minified}
 
 Current Values:
