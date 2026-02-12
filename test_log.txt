@@ -1,0 +1,66 @@
+﻿
+[1m[94m============================================================[0m
+[1m[94mPHASE 3 INTEGRATION TEST SUITE[0m
+[1m[94m============================================================[0m
+
+[96mÔä╣´©Å  Checking bot service health...[0m
+[92mÔ£à PASS[0m Service Health - Bot service is running
+
+[1m[94m============================================================[0m
+[1m[94mSETUP: Caching Original Values[0m
+[1m[94m============================================================[0m
+
+[96mÔä╣´©Å  Cached: chat.value.json[0m
+[96mÔä╣´©Å  Cached: matchmaking.value.json[0m
+[96mÔä╣´©Å  Cached: tournament.value.json[0m
+
+[1m[94m============================================================[0m
+[1m[94mCATEGORY A: Phase 2 Integration (Service Health)[0m
+[1m[94m============================================================[0m
+
+[92mÔ£à PASS[0m Unknown App Error Handling - Returned 400 with proper error handling
+
+[1m[94m============================================================[0m
+[1m[94mCATEGORY B: Phase 3 Logic (LLM & Constraints)[0m
+[1m[94m============================================================[0m
+
+[96mÔä╣´©Å  Test 1: Max Violation[0m
+[92mÔ£à PASS[0m Max Violation - Tournament Replicas > 999 - Constraint enforced - replicas=2
+
+[96mÔä╣´©Å  Test 2: Enum Violation[0m
+[92mÔ£à PASS[0m Enum Violation - Matchmaking imagePullPolicy - Original preserved - imagePullPolicy=IfNotPresent
+
+[96mÔä╣´©Å  Test 3: Required Field[0m
+[92mÔ£à PASS[0m Required Field - Matchmaking Image - Required field preserved - image=matchmaking:1.2.3
+
+[1m[94m============================================================[0m
+[1m[94mCATEGORY C: README Examples (Happy Path)[0m
+[1m[94m============================================================[0m
+
+[96mÔä╣´©Å  Test 4: Tournament Memory (1024mb)[0m
+[92mÔ£à PASS[0m README Example - Tournament Memory - memory.limitMiB=1024
+
+[96mÔä╣´©Å  Test 5: Matchmaking GAME_NAME Env[0m
+[92mÔ£à PASS[0m README Example - Matchmaking GAME_NAME Env - GAME_NAME=toyblast
+
+[96mÔä╣´©Å  Test 6: Chat CPU Limit (80%)[0m
+[92mÔ£à PASS[0m README Example - Chat CPU Limit - CPU changed: 1500 -> 800
+
+[1m[94m============================================================[0m
+[1m[94mTEARDOWN: Restoring Original Values[0m
+[1m[94m============================================================[0m
+
+[96mÔä╣´©Å  Restored: chat.value.json[0m
+[96mÔä╣´©Å  Restored: matchmaking.value.json[0m
+[96mÔä╣´©Å  Restored: tournament.value.json[0m
+
+[1m[94m============================================================[0m
+[1m[94mTEST SUMMARY[0m
+[1m[94m============================================================[0m
+
+[92mPassed:  8[0m
+[91mFailed:  0[0m
+[93mSkipped: 0[0m
+[1mTotal:   8[0m
+
+[92m[1mALL TESTS PASSED[0m
