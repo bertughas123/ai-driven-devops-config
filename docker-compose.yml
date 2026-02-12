@@ -1,0 +1,126 @@
+version: "3.8"
+
+services:
+  # =========================================================================
+  # OLLAMA - AI/LLM Engine
+  # =========================================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "ollama list || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # =========================================================================
+  # INIT-OLLAMA - Model Puller (One-time)
+  # =========================================================================
+  init-ollama:
+    image: curlimages/curl:latest
+    container_name: init-ollama
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        echo 'Pulling llama3.2 model (~2GB)...' &&
+        curl -X POST http://ollama:11434/api/pull -d '{\"name\": \"llama3.2\"}' &&
+        echo 'Model ready!'
+      "
+    restart: "no"
+
+  # =========================================================================
+  # SCHEMA SERVICE
+  # =========================================================================
+  schema-server:
+    build:
+      context: ./schema-server
+      dockerfile: Dockerfile
+    container_name: schema-server
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./data:/data:ro
+    environment:
+      - SCHEMA_DIR=/data/schemas
+      - HOST=0.0.0.0
+      - PORT=5001
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5001/tournament" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # =========================================================================
+  # VALUES SERVICE
+  # =========================================================================
+  values-server:
+    build:
+      context: ./values-server
+      dockerfile: Dockerfile
+    container_name: values-server
+    ports:
+      - "5002:5002"
+    volumes:
+      - ./data:/data
+    environment:
+      - VALUES_DIR=/data/values
+      - HOST=0.0.0.0
+      - PORT=5002
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5002/tournament" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # =========================================================================
+  # BOT SERVICE (Async Architecture)
+  # =========================================================================
+  bot-server:
+    build:
+      context: ./bot-server
+      dockerfile: Dockerfile
+    container_name: bot-server
+    ports:
+      - "5003:5003"
+    volumes:
+      - ./data:/data
+      - .tests:/app/tests
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - LLM_MODEL=${LLM_MODEL:-llama3.2}
+      - SCHEMA_SERVICE_URL=http://schema-server:5001
+      - VALUES_SERVICE_URL=http://values-server:5002
+      - VALUES_DIR=/data/values
+      - HOST=0.0.0.0
+      - PORT=5003
+    depends_on:
+      ollama:
+        condition: service_healthy
+      schema-server:
+        condition: service_healthy
+      values-server:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5003/docs" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  ollama_data:
+    name: ollama_data
