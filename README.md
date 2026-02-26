@@ -53,11 +53,7 @@ After this change, Llama 3.2 3B passed all 8 test cases consistently(see test_re
 - JSON minification via `json.dumps(separators=(',',':'))` removes all whitespace, reduces token count before sending to LLM
 - `format="json"` forces Ollama to return pure JSON only, so no need to strip markdown fences or parse prose from the output
 
-
-## 4. The _jk Suffix
-- the `[_jk]` suffix was added to the generate_config_jk function to fulfill README.md requirement for identifying LLM-assisted implementation
-
-## 5. Micro-Fragment + Schema Pruning Architecture
+## 4. Micro-Fragment + Schema Pruning Architecture
 
 **Problem**: Small models fail on large JSON, "lazy output" (drop keys) and "flattening" (merge nested structures).
 
@@ -71,7 +67,7 @@ After this change, Llama 3.2 3B passed all 8 test cases consistently(see test_re
 
 **Result**: Values ~700 → **~30 tokens**, Schema ~1700 → **~10 lines**. This is what makes 3B viable.
 
-## 6. Safety & Validation
+## 5. Safety & Validation
 
 LLMs are non-deterministic, so three defense layers protect against bad output:
 
@@ -81,14 +77,14 @@ LLMs are non-deterministic, so three defense layers protect against bad output:
 
 Error codes: `400` unrecognized app name, `404` schema/values not found, `500` validation failure or invalid LLM JSON, `503` Ollama or upstream service unreachable/timeout
 
-## 7. Inter-Service Communication
+## 6. Inter-Service Communication
 
 - Bot calls Schema and Values services via `httpx.AsyncClient` (async, non-blocking)
 - Timeout: `900s` to accommodate slow LLM inference on consumer hardware (for my own slow computer)
 - Error handling: `ConnectError` / `TimeoutException` → returns 503
 - Docker Compose service discovery: container names as hostnames (`http://schema-server:5001`, `http://values-server:5002`, `http://ollama:11434`)
 
-## 8. End-to-End Request Flow
+## 7. End-to-End Request Flow
 
 User sends `POST /message` with for example `{"input": "set tournament memory to 2048mb"}`. The pipeline:
 
@@ -101,7 +97,7 @@ User sends `POST /message` with for example `{"input": "set tournament memory to
 7. [validate_against_schema()] validates final JSON against full schema
 8. If valid → [save_values()] writes to disk, returns HTTP 200. If invalid → **Safety Net** returns original values unchanged.
 
-## 9. Docker & Containerization
+## 8. Docker & Containerization
 
 The entire system runs as 5 containers via [docker-compose.yml]: Ollama (LLM engine), init-ollama (one-shot model puller), and the three app services.
 
@@ -115,13 +111,13 @@ The `./data` directory is shared across services (read-only for schema, read-wri
 
 All configuration lives in environment variables. `LLM_MODEL` defaults to `llama3.2` but can be overridden without rebuilding any image.
 
-## 10. Test Strategy
+## 9. Test Strategy
 
 - [tests/test_phase3.py]: 8 tests covering service health, schema constraint enforcement (max, enum, required), and README curl examples
 - [tests/test_phase3_forReadme.py]: 3 focused tests validating exact README examples with field-by-field assertions
 - All tests backup and restore original value files before/after each test
 
-## 11. How to Run
+## 10. How to Run
 
 Start the entire stack:
 ```bash
